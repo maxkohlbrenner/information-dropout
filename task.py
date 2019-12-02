@@ -48,12 +48,12 @@ class Stats(object):
         self.stats_count = collections.OrderedDict()
 
     def push(self, **kwargs):
-        for k, v in kwargs.iteritems():
+        for k, v in kwargs.items():
             self.stats[k] = self.stats.get(k, 0.) + v
             self.stats_count[k] = self.stats_count.get(k, 0) + 1
 
     def push_epoch(self):
-        epoch_stats = {k:v/self.stats_count[k] for k, v in self.stats.iteritems()}
+        epoch_stats = {k:v/self.stats_count[k] for k, v in self.stats.items()}
         self.history.append(epoch_stats)
         self.print_epoch()
         self.reset()
@@ -181,7 +181,7 @@ class Task(object):
         self.valid_stats = Stats('valid')
         self.test_stats = Stats('test')
         try:
-            for i in xrange(start_epoch, end_epoch):
+            for i in range(start_epoch, end_epoch):
                 if i < drop1:
                     self.current_learning_rate = learning_rate
                 elif i < drop2:
