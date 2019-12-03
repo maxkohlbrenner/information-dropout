@@ -64,7 +64,7 @@ class Stats(object):
         if self.name is not None:
             print('%s: ' % self.name.capitalize() , end='')
         print( '%3d: ' % len(self.history), end='')
-        for k in self.stats.iterkeys():
+        for k in self.stats.keys():
             print('%s: %.3f ' % (k, self[k]), end='')
         print('===') 
 
