@@ -104,6 +104,8 @@ class MyTask(Task):
             tf.add_to_collection('kl_terms', kl)
         # Samples the noise with the given parameter
         e = sample_lognormal(mean=tf.zeros_like(network), sigma = alpha, sigma0 = self.sigma0)
+        # Gather all infodropout layer activations in a collection
+        tf.add_to_collection('dropout_layer_activations', network)
         # Returns the noisy output of the dropout
         return network * e
 
@@ -114,6 +116,7 @@ class MyTask(Task):
         elif dropout == 'binary':
             network = self.conv(inputs, num_outputs, stride=2)
             network = tf.nn.dropout(network, self.keep_prob)
+            tf.add_to_collection('dropout_layer_activations', network)
         elif dropout == 'none':
             network = self.conv(inputs, num_outputs, stride=2)
         else:
@@ -166,6 +169,7 @@ class MyTask(Task):
             loss = Lx + beta * Lz + weight_decay * L2
             correct_prediction = tf.equal(tf.argmax(logits,1), tf.argmax(self.y,1))
             accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+        self.logits = logits
         self.loss = loss
         self.error = (1. - accuracy) * 100.
         self.Lx = Lx
@@ -224,7 +228,7 @@ class MyTask(Task):
             batch_cost = self.sess.run( [ self.loss], feed_dict)
 
     @task_ingredient.capture
-    def plot_kl(self, batch_size):
+    def plot_kl(self, batch_size, even_labels):
         import matplotlib as mpl
         mpl.use('Agg')
         import matplotlib.pyplot as plt
@@ -233,24 +237,46 @@ class MyTask(Task):
         xtrain = xtrain.reshape(batch_size,img_h,img_w,1)
         ytrain_p = self.preprocess_labels(ytrain)
         feed_dict = {self.x: xtrain, self.y: ytrain_p, self.sigma0: 0., self.keep_prob: 1.}
-        kls = self.sess.run(tf.get_collection('kl_terms'), feed_dict)
+        logits, kls, acts = self.sess.run([self.logits, tf.get_collection('kl_terms'),
+                             tf.get_collection('dropout_layer_activations')], feed_dict)
         kls = [k.sum(axis=-1) for k in kls]
         kls = [k - k.min() for k in kls]
 
         basepath = 'plots/'+self.get_name()+'/'
         if not os.path.exists(basepath):
             os.makedirs(basepath)
+
+        rows = 1 + int(len(kls) > 0)
+        cols = 1 + len(acts)
+
         for j in range(5):
             plt.clf()
+            fig = plt.figure(figsize=(14, 5))
+
+            plt.subplot(rows, cols, 1)
             plt.axis('off')
             plt.imshow(xtrain[j,:,:,0], cmap='gray', interpolation='none')
-            plt.title(ytrain[j])
-            plt.savefig(basepath+'kl_%d_0.png' % j, bbox_inches='tight')
-            for i,k in enumerate(kls):
-                plt.clf()
-                plt.imshow(k[j], cmap='Blues', interpolation='none')
+            if even_labels:
+                predicted_class = 2 * np.argmax(logits[j])
+                plt.title('target: {}\nprediction: {}'.format(ytrain[j][0],
+                                                              predicted_class))
+            else:
+                predicted_class = 2 * np.argmax(logits[j]) + 1
+                plt.title('target: {}\nprediction: {}'.format(ytrain[j][1],
+                                                              predicted_class))
+            for i,act in enumerate(acts):
+                plt.subplot(rows, cols, 2 + i)
+                plt.title('Activation')
+                plt.imshow(act[j].mean(2), cmap='Blues', interpolation='none')
                 plt.axis('off')
-                plt.savefig(basepath+'kl_%d_%d.png' % (j,i+1), bbox_inches='tight')
+                plt.colorbar()
+                if len(kls) > 0:
+                    plt.subplot(rows, cols, 2 + i + cols)
+                    plt.title('KL-Div')
+                    plt.imshow(kls[i][j], cmap='Blues', interpolation='none')
+                    plt.axis('off')
+                    plt.colorbar()
+            plt.savefig(basepath+'ex_{}_acts.png'.format(j), bbox_inches='tight')
 
 mytask = task = MyTask()
 
