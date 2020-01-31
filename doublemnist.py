@@ -239,6 +239,7 @@ class MyTask(Task):
         feed_dict = {self.x: xtrain, self.y: ytrain_p, self.sigma0: 0., self.keep_prob: 1.}
         logits, kls, acts = self.sess.run([self.logits, tf.get_collection('kl_terms'),
                              tf.get_collection('dropout_layer_activations')], feed_dict)
+        raw_kls = kls
         kls = [k.sum(axis=-1) for k in kls]
         kls = [k - k.min() for k in kls]
 
@@ -276,7 +277,46 @@ class MyTask(Task):
                     plt.imshow(kls[i][j], cmap='Blues', interpolation='none')
                     plt.axis('off')
                     plt.colorbar()
+
             plt.savefig(basepath+'ex_{}_acts.png'.format(j), bbox_inches='tight')
+
+
+        cmap = 'viridis'
+
+        # plot last-layer acts + kl-divs per class
+        rows = 1 + int(len(kls) > 0)
+        cols = 1 + acts[3].shape[2]
+        for j in range(5):
+            plt.clf()
+            fig = plt.figure(figsize=(14, 5))
+
+            plt.subplot(rows, cols, 1)
+            plt.axis('off')
+            plt.imshow(xtrain[j,:,:,0], cmap='gray', interpolation='none')
+            if even_labels:
+                predicted_class = 2 * np.argmax(logits[j])
+                plt.title('target: {}\nprediction: {}'.format(ytrain[j][0],
+                                                              predicted_class))
+            else:
+                predicted_class = 2 * np.argmax(logits[j]) + 1
+                plt.title('target: {}\nprediction: {}'.format(ytrain[j][1],
+                                                              predicted_class))
+
+            for c_ind, c in enumerate(2 * np.arange(5) + (1 - int(even_labels))):
+                act = acts[3][j][:,:,c_ind]
+                plt.subplot(rows, cols, 2 + c_ind)
+                plt.imshow(act, cmap=cmap)
+                plt.title(c)
+                plt.axis('off')
+
+                if kls:
+                    kl = raw_kls[3][j][:,:,c_ind]
+                    plt.subplot(rows, cols, 2 + cols + c_ind)
+                    plt.imshow(kl, cmap=cmap)
+                    plt.axis('off')
+
+            plt.savefig(basepath+'ex_{}_per_class_last_layer_acts_n_kls.png'.format(j), bbox_inches='tight')
+
 
 mytask = task = MyTask()
 
