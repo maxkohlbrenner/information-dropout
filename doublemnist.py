@@ -301,56 +301,6 @@ class MyTask(Task):
 
             plt.savefig(basepath+'ex_{}_acts.png'.format(j), bbox_inches='tight')
 
-        # ####################################################################
-        # this was WRONG, dont use it, only leave it here for understanding of
-        # the old plots
-        plot_per_class = False
-        if plot_per_class:
-            # plot last-layer acts + kl-divs per class
-            rows = 1 + int(len(kls) > 0)
-            cols = 1 + acts[3].shape[2]
-            for j in range(5):
-                plt.clf()
-                fig = plt.figure(figsize=(14, 5))
-
-                plt.subplot(rows, cols, 1)
-                plt.axis('off')
-                plt.imshow(xtrain[j,:,:,0], cmap='gray', interpolation='none')
-                if even_labels:
-                    predicted_class = 2 * np.argmax(logits[j])
-                    plt.title('target: {}\nprediction: {}'.format(ytrain[j][0],
-                                                                  predicted_class))
-                else:
-                    predicted_class = 2 * np.argmax(logits[j]) + 1
-                    plt.title('target: {}\nprediction: {}'.format(ytrain[j][1],
-                                                                  predicted_class))
-
-                for c_ind, c in enumerate(2 * np.arange(5) + (1 - int(even_labels))):
-                    print('acts[3].shape')
-                    print(acts[3][j].shape)
-
-                    print('actslen')
-                    print(len(acts))
-                    print(len(acts[3]))
-
-                    act = acts[3][j][:,:,c_ind]
-                    plt.subplot(rows, cols, 2 + c_ind)
-                    plt.imshow(act, cmap=cmap)
-                    plt.title(c)
-                    plt.axis('off')
-                    plt.colorbar()
-
-                    if kls:
-                        kl = raw_kls[3][j][:,:,c_ind]
-                        plt.subplot(rows, cols, 2 + cols + c_ind)
-                        plt.imshow(kl, cmap=cmap)
-                        plt.colorbar()
-
-                        plt.axis('off')
-
-                plt.savefig(basepath+'ex_{}_per_class_last_layer_acts_n_kls.png'.format(j), bbox_inches='tight')
-        # ####################################################################
-
 mytask = task = MyTask()
 
 @ex.command
