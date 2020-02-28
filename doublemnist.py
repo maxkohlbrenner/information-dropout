@@ -107,7 +107,9 @@ class MyTask(Task):
         # Gather all infodropout layer activations in a collection
         tf.add_to_collection('dropout_layer_activations', network)
         # Returns the noisy output of the dropout
-        return network * e
+        tf.add_to_collection('dropout_layer_noise_sample', e)
+        d_out = network * e
+        return d_out
 
     @ex.capture
     def conv_dropout(self, inputs, num_outputs, dropout):
@@ -237,18 +239,29 @@ class MyTask(Task):
         xtrain = xtrain.reshape(batch_size,img_h,img_w,1)
         ytrain_p = self.preprocess_labels(ytrain)
         feed_dict = {self.x: xtrain, self.y: ytrain_p, self.sigma0: 0., self.keep_prob: 1.}
-        logits, kls, acts = self.sess.run([self.logits, tf.get_collection('kl_terms'),
-                             tf.get_collection('dropout_layer_activations')], feed_dict)
+        logits, kls, acts, dnss = self.sess.run([self.logits, tf.get_collection('kl_terms'),
+                             tf.get_collection('dropout_layer_activations'),
+                             tf.get_collection('dropout_layer_noise_sample') ], feed_dict)
         raw_kls = kls
-        kls = [k.sum(axis=-1) for k in kls]
-        kls = [k - k.min() for k in kls]
 
         basepath = 'plots/'+self.get_name()+'/'
         if not os.path.exists(basepath):
-            os.makedirs(basepath)
+            os.mkdir(basepath)
 
-        rows = 1 + int(len(kls) > 0)
+        [np.save(basepath + 'rawkls_{}'.format(kl_idx), rkl) for kl_idx, rkl in
+         enumerate(raw_kls)]
+        [np.save(basepath + 'acts_{}'.format(act_idx), act) for act_idx, act in
+         enumerate(acts)]
+        [np.save(basepath + 'd_noise_samples_{}'.format(d_idx), dns) for d_idx,
+         dns in enumerate(dnss)]
+
+        # kls = [k.sum(axis=-1) for k in kls]
+        # kls = [k - k.min() for k in kls]
+
+        rows = 1 + int(len(kls) > 0) + int(len(dnss) > 0)
         cols = 1 + len(acts)
+
+        cmap = 'viridis'
 
         for j in range(5):
             plt.clf()
@@ -268,20 +281,22 @@ class MyTask(Task):
             for i,act in enumerate(acts):
                 plt.subplot(rows, cols, 2 + i)
                 plt.title('Activation')
-                plt.imshow(act[j].mean(2), cmap='Blues', interpolation='none')
+                plt.imshow(act[j].sum(2), cmap=cmap, interpolation='none')
                 plt.axis('off')
                 plt.colorbar()
                 if len(kls) > 0:
                     plt.subplot(rows, cols, 2 + i + cols)
                     plt.title('KL-Div')
-                    plt.imshow(kls[i][j], cmap='Blues', interpolation='none')
+                    plt.imshow(kls[i][j].sum(axis=-1), cmap=cmap, interpolation='none')
                     plt.axis('off')
                     plt.colorbar()
 
-            plt.savefig(basepath+'ex_{}_acts.png'.format(j), bbox_inches='tight')
-
-
-        cmap = 'viridis'
+                if len(dnss) > 0:
+                    plt.subplot(rows, cols, 2 + i + 2*cols)
+                    plt.title('d_out')
+                    plt.imshow(dnss[i][j].sum(axis=-1), cmap=cmap, interpolation='none')
+                    plt.axis('off')
+                    plt.colorbar()
 
         # plot last-layer acts + kl-divs per class
         rows = 1 + int(len(kls) > 0)
