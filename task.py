@@ -182,6 +182,7 @@ class Task(object):
         self.test_stats = Stats('test')
         try:
             for i in range(start_epoch, end_epoch):
+                _log.info("...starting epoch {}/{}".format(i+1, end_epoch))
                 if i < drop1:
                     self.current_learning_rate = learning_rate
                 elif i < drop2:
